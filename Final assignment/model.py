@@ -27,6 +27,7 @@ class Model(nn.Module):
         
         super().__init__()
         # Implement the Unet with ResNet50 encoder as backbone encoder already trained with imagenet
+        self.in_channels = in_channels
         self.model = smp.Unet(
             encoder_name="resnet50", 
             encoder_weights="imagenet", 
@@ -45,7 +46,7 @@ class Model(nn.Module):
             x (torch.Tensor): Input tensor of shape (batch_size, in_channels, height, width).
         """
         # Check if the input tensor has the expected number of channels
-        if x.shape[1] != self.model.encoder.in_channels:
+        if x.shape[1] != self.in_channels:
             raise ValueError(f"Expected {self.in_channels} input channels, but got {x.shape[1]}")
         
         logits = self.model(x)
