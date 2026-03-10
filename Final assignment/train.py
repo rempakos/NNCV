@@ -32,7 +32,27 @@ from torchvision.transforms.v2 import (
 )
 
 from model import Model
+from dataset import CityscapeAlbumentations
+import numpy as np
+import albumentations as A
 
+#We do big transformations to the dataset we diversify it and make it more robust.
+train_transformation = A.Compose(
+[
+    A.RandomScale(scale_limit=(-0.5, 1.0), interpolation=1, p=1.0),
+    A.PadIfNeeded(min_height=512, min_width=1024, border_mode=0, p=1.0),
+    A.RandomCrop(height=512, width=1024, p=1.0),
+    A.HorizontalFlip(p=0.5),
+    A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=0.5),
+    A.Normalize(mean=(0.485, 0.456, 0.406),std=(0.229, 0.224, 0.225),p=1.0),
+])
+# Similarly we apply some transformations but with consistency to the validation
+#as we want to be able to compare the results to the original.
+validation_transformation = A.Compose(
+[
+    A.Resize(height=512, width=1024, interpolation=1, p=1.0),
+    A.Normalize(mean=(0.485, 0.456, 0.406),std=(0.229, 0.224, 0.225),p=1.0),
+])
 
 # Mapping class IDs to train IDs
 id_to_trainid = {cls.id: cls.train_id for cls in Cityscapes.classes}
@@ -91,29 +111,12 @@ def main(args):
     # Define the device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Define the transforms to apply to the data
-    img_transform = Compose([
-    ToImage(),
-    Resize((256, 256)),
-    ToDtype(torch.float32, scale=True),
-    Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    ])
-
-    # Target transform (mask)
-    target_transform = Compose([
-        ToImage(),
-        Resize((256, 256), interpolation=InterpolationMode.NEAREST),
-        ToDtype(torch.int64),  # no scaling
-    ])
-
-    # Load the dataset and make a split for training and validation
+    # Load the dataset
     train_dataset = Cityscapes(
     args.data_dir,
     split="train",
     mode="fine",
     target_type="semantic",
-    transform=img_transform,
-    target_transform=target_transform,
     )
 
     valid_dataset = Cityscapes(
@@ -121,10 +124,12 @@ def main(args):
         split="val",
         mode="fine",
         target_type="semantic",
-        transform=img_transform,
-        target_transform=target_transform,
     )
+    # wrap the dataset with CityscapeAlbumentations to incorporate the transformations
+    train_dataset = CityscapeAlbumentations(train_dataset, transform=train_transformation)
+    valid_dataset = CityscapeAlbumentations(valid_dataset, transform=validation_transformation)
 
+    # make dataloaders for the datasets
     train_dataloader = DataLoader(
         train_dataset, 
         batch_size=args.batch_size, 

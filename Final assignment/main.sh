@@ -1,3 +1,4 @@
+pip install albumentations
 wandb login
 
 python3 train.py \
