@@ -1,4 +1,5 @@
 pip install albumentations
+pip install segmentation-models-pytorch
 wandb login
 
 python3 train.py \
