@@ -33,6 +33,7 @@ from torchvision.transforms.v2 import (
 
 from model import Model
 from dataset import CityscapeAlbumentations
+from segmentation_models_pytorch.losses import DiceLoss
 import numpy as np
 import albumentations as A
 
@@ -149,11 +150,16 @@ def main(args):
         n_classes=19,  # 19 classes in the Cityscapes dataset
     ).to(device)
 
-    # Define the loss function
-    criterion = nn.CrossEntropyLoss(ignore_index=255)  # Ignore the void class
+    # Define the loss function to be cross entropy combined with dice loss
+    # in order to combat cityscapes class imbalance and get better results.
+    # 255 means "unlabeled" in the cityscape dataset and is ignored
+    cross_entropy_loss = nn.CrossEntropyLoss(ignore_index=255)
+    dice_loss = DiceLoss(mode='multiclass', ignore_index=255)
 
     # Define the optimizer
     optimizer = AdamW(model.parameters(), lr=args.lr)
+
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
 
     # Training loop
     best_valid_loss = float('inf')
@@ -172,7 +178,7 @@ def main(args):
 
             optimizer.zero_grad()
             outputs = model(images)
-            loss = criterion(outputs, labels)
+            loss = 0.5 * cross_entropy_loss(outputs, labels) + 0.5 * dice_loss(outputs, labels)
             loss.backward()
             optimizer.step()
 
@@ -194,7 +200,7 @@ def main(args):
                 labels = labels.long().squeeze(1)  # Remove channel dimension
 
                 outputs = model(images)
-                loss = criterion(outputs, labels)
+                loss = 0.5 * cross_entropy_loss(outputs, labels) + 0.5 * dice_loss(outputs, labels)
                 losses.append(loss.item())
             
                 if i == 0:
@@ -231,6 +237,8 @@ def main(args):
                     f"best_model-epoch={epoch:04}-val_loss={valid_loss:04}.pt"
                 )
                 torch.save(model.state_dict(), current_best_model_path)
+                
+            scheduler.step()
         
     print("Training complete!")
 
