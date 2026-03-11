@@ -20,3 +20,4 @@ runs/
 *.npz
 slurm-*.out
 .DS_Store
+*.tar
