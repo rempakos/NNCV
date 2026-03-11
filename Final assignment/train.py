@@ -127,8 +127,8 @@ def main(args):
         target_type="semantic",
     )
     # wrap the dataset with CityscapeAlbumentations to incorporate the transformations
-    train_dataset = CityscapeAlbumentations(train_dataset, transform=train_transformation)
-    valid_dataset = CityscapeAlbumentations(valid_dataset, transform=validation_transformation)
+    train_dataset = CityscapeAlbumentations(train_dataset, transform=train_transformation, apply_fourier=True)
+    valid_dataset = CityscapeAlbumentations(valid_dataset, transform=validation_transformation, apply_fourier=False)
 
     # make dataloaders for the datasets
     train_dataloader = DataLoader(
