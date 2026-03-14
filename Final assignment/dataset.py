@@ -1,8 +1,9 @@
 import numpy as np
 import torch
 import albumentations as A
+import config
 
-def fast_fourier_transform(img1,img2,alpha=0.3):
+def fast_fourier_transform(img1, img2, alpha=config.FOURIER_ALPHA):
     """
     Inspired by the paper "Fourier Domain Adaptation for Sematic Segmentation" this function aims to utilize
     the Fourier Transform not for domain adaptation but data augmentation in training instead
@@ -66,7 +67,7 @@ class CityscapeAlbumentations(torch.utils.data.Dataset):
         image = np.array(image) # height,width,rgb
         mask = np.array(target) #0-255 values
 
-        if self.apply_fourier and np.random.rand() < 0.5: # apply fourier augmentation with 50% chance
+        if self.apply_fourier and np.random.rand() < config.FOURIER_PROBABILITY: # apply fourier augmentation with configured probability
             #pick a random image from the dataset to blend with the currently processed image
             img2_index = np.random.randint(0, len(self.dataset))
             img2, _ = self.dataset[img2_index]

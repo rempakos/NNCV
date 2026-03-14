@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import segmentation_models_pytorch as smp
+import config
 
 
 class Model(nn.Module):
@@ -16,26 +17,41 @@ class Model(nn.Module):
     """
     def __init__(
         self, 
-        in_channels=3, 
-        n_classes=19
+        in_channels=None, 
+        n_classes=None,
+        encoder_name=None,
+        encoder_weights=None,
+        decoder_channels=None,
+        decoder_attention_type=None,
     ):
         """
         Args:
             in_channels (int): Number of input channels. Default is 3 for RGB images.
             n_classes (int): Number of output classes. Default is 19 for the Cityscapes dataset.
+            encoder_name (str): Backbone encoder. Default is resnet101.
+            encoder_weights (str): Pre-trained weights. Default is imagenet.
+            decoder_channels (tuple): Decoder channel dimensions.
+            decoder_attention_type (str): Attention mechanism type.
         """
+        # Use config defaults if parameters not provided
+        in_channels = in_channels or config.IN_CHANNELS
+        n_classes = n_classes or config.N_CLASSES
+        encoder_name = encoder_name or config.ENCODER_NAME
+        encoder_weights = encoder_weights or config.ENCODER_WEIGHTS
+        decoder_channels = decoder_channels or config.DECODER_CHANNELS
+        decoder_attention_type = decoder_attention_type or config.DECODER_ATTENTION_TYPE
         
         super().__init__()
-        # Implement the Unet with ResNet50 encoder as backbone encoder already trained with imagenet
+        # Implement the Unet with configurable encoder as backbone already trained with imagenet
         self.in_channels = in_channels
         self.model = smp.Unet(
-            encoder_name="resnet50", 
-            encoder_weights="imagenet", 
+            encoder_name=encoder_name, 
+            encoder_weights=encoder_weights, 
             in_channels=in_channels, 
             classes=n_classes,
-            decoder_use_batchnorm=True,
-            decoder_channels=(256, 128, 64, 32, 16),
-            decoder_attention_type=None,
+            decoder_use_batchnorm=config.DECODER_USE_BATCHNORM,
+            decoder_channels=decoder_channels,
+            decoder_attention_type=decoder_attention_type,
         )
 
     def forward(self, x):

@@ -36,6 +36,7 @@ from dataset import CityscapeAlbumentations
 from segmentation_models_pytorch.losses import DiceLoss
 import numpy as np
 import albumentations as A
+import config
 
 #We do big transformations to the dataset we diversify it and make it more robust.
 train_transformation = A.Compose(
@@ -80,27 +81,34 @@ def convert_train_id_to_color(prediction: torch.Tensor) -> torch.Tensor:
 def get_args_parser():
 
     parser = ArgumentParser("Training script for a PyTorch U-Net model")
-    parser.add_argument("--data-dir", type=str, default="./data/cityscapes", help="Path to the training data")
-    parser.add_argument("--batch-size", type=int, default=64, help="Training batch size")
-    parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
-    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
-    parser.add_argument("--num-workers", type=int, default=10, help="Number of workers for data loaders")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
-    parser.add_argument("--experiment-id", type=str, default="unet-training", help="Experiment ID for Weights & Biases")
-
+    parser.add_argument("--data-dir", type=str, default=config.DATA_DIR, help="Path to the training data")
+    parser.add_argument("--batch-size", type=int, default=config.BATCH_SIZE, help="Training batch size")
+    parser.add_argument("--epochs", type=int, default=config.EPOCHS, help="Number of training epochs")
+    parser.add_argument("--lr", type=float, default=config.LEARNING_RATE, help="Learning rate")
+    parser.add_argument("--num-workers", type=int, default=config.NUM_WORKERS, help="Number of workers for data loaders")
+    parser.add_argument("--seed", type=int, default=config.SEED, help="Random seed for reproducibility")
+    parser.add_argument("--experiment-id", type=str, default=config.EXPERIMENT_ID, help="Experiment ID for Weights & Biases")
+    
+    # Model architecture arguments
+    parser.add_argument("--encoder-name", type=str, default=config.ENCODER_NAME, help="Encoder backbone: resnet50, resnet101, resnet152, etc.")
+    parser.add_argument("--decoder-attention-type", type=str, default=config.DECODER_ATTENTION_TYPE, help="Attention type: None, 'scse', or 'spatial'")
+    
+    # Data augmentation arguments
+    parser.add_argument("--apply-fourier", type=lambda x: (str(x).lower() == 'true'), default=config.APPLY_FOURIER, help="Enable Fourier augmentation")
+    
     return parser
 
 
 def main(args):
     # Initialize wandb for logging
     wandb.init(
-        project="5lsm0-cityscapes-segmentation",  # Project name in wandb
+        project=config.WANDB_PROJECT,  # Project name in wandb
         name=args.experiment_id,  # Experiment name in wandb
         config=vars(args),  # Save hyperparameters
     )
 
     # Create output directory if it doesn't exist
-    output_dir = os.path.join("checkpoints", args.experiment_id)
+    output_dir = os.path.join(config.CHECKPOINT_DIR, args.experiment_id)
     os.makedirs(output_dir, exist_ok=True)
 
     # Set seed for reproducability
@@ -127,7 +135,8 @@ def main(args):
         target_type="semantic",
     )
     # wrap the dataset with CityscapeAlbumentations to incorporate the transformations
-    train_dataset = CityscapeAlbumentations(train_dataset, transform=train_transformation, apply_fourier=True)
+    # Note: apply_fourier only applies to training set; validation always has apply_fourier=False
+    train_dataset = CityscapeAlbumentations(train_dataset, transform=train_transformation, apply_fourier=args.apply_fourier)
     valid_dataset = CityscapeAlbumentations(valid_dataset, transform=validation_transformation, apply_fourier=False)
 
     # make dataloaders for the datasets
@@ -146,8 +155,10 @@ def main(args):
 
     # Define the model
     model = Model(
-        in_channels=3,  # RGB images
-        n_classes=19,  # 19 classes in the Cityscapes dataset
+        in_channels=config.IN_CHANNELS,
+        n_classes=config.N_CLASSES,
+        encoder_name=args.encoder_name,
+        decoder_attention_type=args.decoder_attention_type,
     ).to(device)
 
     # Define the loss function to be cross entropy combined with dice loss
@@ -155,11 +166,17 @@ def main(args):
     # 255 means "unlabeled" in the cityscape dataset and is ignored
     cross_entropy_loss = nn.CrossEntropyLoss(ignore_index=255)
     dice_loss = DiceLoss(mode='multiclass', ignore_index=255)
+    ce_weight = config.LOSS_WEIGHTS["cross_entropy"]
+    dice_weight = config.LOSS_WEIGHTS["dice"]
 
     # Define the optimizer
     optimizer = AdamW(model.parameters(), lr=args.lr)
 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, 
+        T_max=config.COSINE_ANNEALING_T_MAX, 
+        eta_min=config.COSINE_ANNEALING_ETA_MIN
+    )
 
     # Training loop
     best_valid_loss = float('inf')
@@ -178,7 +195,7 @@ def main(args):
 
             optimizer.zero_grad()
             outputs = model(images)
-            loss = 0.5 * cross_entropy_loss(outputs, labels) + 0.5 * dice_loss(outputs, labels)
+            loss = ce_weight * cross_entropy_loss(outputs, labels) + dice_weight * dice_loss(outputs, labels)
             loss.backward()
             optimizer.step()
 
@@ -200,7 +217,7 @@ def main(args):
                 labels = labels.long().squeeze(1)  # Remove channel dimension
 
                 outputs = model(images)
-                loss = 0.5 * cross_entropy_loss(outputs, labels) + 0.5 * dice_loss(outputs, labels)
+                loss = ce_weight * cross_entropy_loss(outputs, labels) + dice_weight * dice_loss(outputs, labels)
                 losses.append(loss.item())
             
                 if i == 0:
