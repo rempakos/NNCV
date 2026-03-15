@@ -66,8 +66,9 @@ def postprocess(pred: torch.Tensor, original_shape: tuple) -> np.ndarray:
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Load model
-    model = Model()
+    # Load model with encoder_weights=None to avoid downloading weights from internet
+    # The trained weights are in model.pt, so we don't need pre-trained encoder weights
+    model = Model(encoder_weights=None)
     state_dict = torch.load(
         MODEL_PATH, 
         map_location=device,
