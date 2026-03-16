@@ -37,7 +37,7 @@ class Model(nn.Module):
         in_channels = in_channels or config.IN_CHANNELS
         n_classes = n_classes or config.N_CLASSES
         encoder_name = encoder_name or config.ENCODER_NAME
-        encoder_weights = encoder_weights or config.ENCODER_WEIGHTS
+        encoder_weights = encoder_weights if encoder_weights is not None else config.ENCODER_WEIGHTS
         decoder_channels = decoder_channels or config.DECODER_CHANNELS
         decoder_attention_type = decoder_attention_type or config.DECODER_ATTENTION_TYPE
         

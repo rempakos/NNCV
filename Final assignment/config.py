@@ -4,7 +4,7 @@ FOURIER_ALPHA = 0.3    # blending factor
 FOURIER_PROBABILITY = 0.5  # Probability of applying fft
 
 # MODEL ARCHITECTURE SETTINGS
-ENCODER_NAME = "resnet101"  # alternatives could be: resnet50, resnet152, etc.
+ENCODER_NAME = "resnet50"  # alternatives could be: resnet50, resnet152, etc.
 ENCODER_WEIGHTS = "imagenet"  # pretrained imagenet or none
 IN_CHANNELS = 3  # RGB images
 N_CLASSES = 19  # Cityscapes dataset classes
