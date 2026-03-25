@@ -1,7 +1,9 @@
 # DATA AUGMENTATION SETTINGS
-APPLY_FOURIER = False  # Fast fourier  transform for data augmentation
+APPLY_FOURIER = True  # Fast fourier  transform for data augmentation
 FOURIER_ALPHA = 0.3    # blending factor
-FOURIER_PROBABILITY = 0.5  # Probability of applying fft
+FOURIER_PROBABILITY = 0.3  # Probability of applying fft (having this less than 1 allows for more diverse training data. If its equal to 1 we focus on robustness completely)
+APPLY_COPYPASTE = True  # Copy Paste augmentation set to true to apply or false to not apply
+COPYPASTE_PROBABILITY = 0.5  # Probability of applying copy-paste (having this less than 1 allows for more diverse training data. If its equal to 1 we focus on robustness completely)
 
 # MODEL ARCHITECTURE SETTINGS
 ENCODER_NAME = "resnet50"  # alternatives could be: resnet50, resnet152, etc.
@@ -26,7 +28,7 @@ EXPERIMENT_ID = "unet-training"
 WANDB_PROJECT = "5lsm0-cityscapes-segmentation"
 
 # LOSS & OPTIMIZATION
-LOSS_WEIGHTS = {"cross_entropy": 0.5, "dice": 0.5}  # Weights for combined loss
+LOSS_WEIGHTS = {"cross_entropy": 0.3, "dice": 0.7}  # Weights for combined loss, dice increased for focus on robustness
 LR_SCHEDULER = "cosine"  # Learning rate scheduler type
 COSINE_ANNEALING_T_MAX = EPOCHS  # T_max for CosineAnnealingLR
 COSINE_ANNEALING_ETA_MIN = 1e-6  # Minimum learning rate
