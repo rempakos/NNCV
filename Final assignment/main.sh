@@ -9,4 +9,4 @@ python3 train.py \
     --lr 0.001 \
     --num-workers 10 \
     --seed 42 \
-    --experiment-id "fft-unet-improved-training" \
+    --experiment-id "ocr-robustness-copypaste-fourier" \
