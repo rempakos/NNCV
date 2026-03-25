@@ -46,7 +46,8 @@ class Model(nn.Module):
         self.align_corners = align_corners
         
         # Load ResNet50 backbone (ignoring encoder_name for now, always use resnet50)
-        resnet = models.resnet50(pretrained=(encoder_weights == "imagenet"))
+        weights = "IMAGENET1K_V1" if encoder_weights == "imagenet" else None
+        resnet = models.resnet50(weights=weights)
         
         # Extract backbone layers (remove classification head)
         self.backbone = nn.Sequential(

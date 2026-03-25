@@ -10,3 +10,5 @@ python3 train.py \
     --num-workers 10 \
     --seed 42 \
     --experiment-id "ocr-robustness-copypaste-fourier" \
+    --apply-fourier true \
+    --apply-copypaste true
