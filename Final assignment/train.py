@@ -39,8 +39,7 @@ import albumentations as A
 import config
 
 #We do big transformations to the dataset we diversify it and make it more robust.
-train_transformation = A.Compose(
-[
+train_transformation = A.Compose([
     A.RandomScale(scale_limit=(-0.5, 1.0), interpolation=1, p=1.0),
     A.PadIfNeeded(min_height=512, min_width=1024, border_mode=0, p=1.0),
     A.RandomCrop(height=512, width=1024, p=1.0),
@@ -95,6 +94,7 @@ def get_args_parser():
     
     # Data augmentation arguments
     parser.add_argument("--apply-fourier", type=lambda x: (str(x).lower() == 'true'), default=config.APPLY_FOURIER, help="Enable Fourier augmentation")
+    parser.add_argument("--apply-copypaste", type=lambda x: (str(x).lower() == 'true'), default=config.APPLY_COPYPASTE, help="Enable Occlusion Copy-Paste augmentation")
     
     return parser
 
@@ -135,9 +135,9 @@ def main(args):
         target_type="semantic",
     )
     # wrap the dataset with CityscapeAlbumentations to incorporate the transformations
-    # Note: apply_fourier only applies to training set; validation always has apply_fourier=False
-    train_dataset = CityscapeAlbumentations(train_dataset, transform=train_transformation, apply_fourier=args.apply_fourier)
-    valid_dataset = CityscapeAlbumentations(valid_dataset, transform=validation_transformation, apply_fourier=False)
+    # Note: apply_fourier and apply_copypaste only apply to training set; validation always has both as False
+    train_dataset = CityscapeAlbumentations(train_dataset, transform=train_transformation, apply_fourier=args.apply_fourier, apply_copypaste=args.apply_copypaste)
+    valid_dataset = CityscapeAlbumentations(valid_dataset, transform=validation_transformation, apply_fourier=False, apply_copypaste=False)
 
     # make dataloaders for the datasets
     train_dataloader = DataLoader(
