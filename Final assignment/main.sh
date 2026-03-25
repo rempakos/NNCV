@@ -9,6 +9,6 @@ python3 train.py \
     --lr 0.001 \
     --num-workers 10 \
     --seed 42 \
-    --experiment-id "ocr-robustness-copypaste-fourier" \
+    --experiment-id "unet-robustness-copypaste-fourier" \
     --apply-fourier true \
     --apply-copypaste true
