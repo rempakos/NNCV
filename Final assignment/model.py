@@ -158,8 +158,8 @@ class OCRHead(nn.Module):
         Returns:
             Main logits and auxiliary logits
         """
-        feat_shallow = feat_list[0]  # 512 channels
-        feat_deep = feat_list[-1]    # 2048 channels
+        feat_shallow = feat_list[0]  # 512 channels, 1/8 scale
+        feat_deep = feat_list[-1]    # 2048 channels, 1/32 scale
         
         # Auxiliary head prediction
         soft_regions = self.aux_head(feat_shallow)
@@ -167,8 +167,13 @@ class OCRHead(nn.Module):
         # Process deep features through OCR
         pixels = self.conv3x3_ocr(feat_deep)
         
+        # Resize soft_regions to match pixels spatial dimensions (1/8 -> 1/32)
+        soft_regions_resized = F.interpolate(
+            soft_regions, size=pixels.shape[2:], mode='bilinear', align_corners=False
+        )
+        
         # Gather object regions
-        object_regions = self.spatial_gather(pixels, soft_regions)
+        object_regions = self.spatial_gather(pixels, soft_regions_resized)
         
         # Apply spatial OCR
         ocr_feat = self.spatial_ocr(pixels, object_regions)
