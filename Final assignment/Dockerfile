@@ -20,6 +20,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir \
     torch torchvision --index-url https://download.pytorch.org/whl/cu126
 RUN pip install --no-cache-dir \
+    segmentation-models-pytorch \
     pillow \
     albumentations \
     numpy \

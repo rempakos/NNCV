@@ -89,7 +89,7 @@ def get_args_parser():
     parser.add_argument("--experiment-id", type=str, default=config.EXPERIMENT_ID, help="Experiment ID for Weights & Biases")
     
     # Model architecture arguments
-    parser.add_argument("--encoder-name", type=str, default=config.ENCODER_NAME, help="Encoder backbone: resnet50 (OCRNet default)")
+    parser.add_argument("--encoder-name", type=str, default=config.ENCODER_NAME, help="Encoder backbone: resnet50")
     
     # Data augmentation arguments
     parser.add_argument("--apply-fourier", type=lambda x: (str(x).lower() == 'true'), default=config.APPLY_FOURIER, help="Enable Fourier augmentation")
