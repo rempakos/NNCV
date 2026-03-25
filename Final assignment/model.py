@@ -67,7 +67,7 @@ class Model(nn.Module):
         # OCR Head
         self.ocr_head = OCRHead(
             num_classes=n_classes,
-            in_channels=self.backbone_channels,
+            in_channels=[512, 2048],
             ocr_mid_channels=ocr_mid_channels,
             ocr_key_channels=ocr_key_channels,
         )
