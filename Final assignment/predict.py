@@ -1,13 +1,16 @@
 """
-Prediction pipeline for the trained segmentation model.
+Prediction pipeline for the trained DINOv2 segmentation model.
 Loads a pre-trained model, processes input images, and saves
 predicted segmentation masks.
+
+Compatible with the challenge submission server.
 """
 
 from pathlib import Path
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from PIL import Image
 from torchvision.transforms.v2 import (
@@ -20,6 +23,7 @@ from torchvision.transforms.v2 import (
 )
 
 from model import Model
+import config
 
 # Fixed paths inside participant container
 IMAGE_DIR = "/data"
@@ -28,9 +32,13 @@ MODEL_PATH = "/app/model.pt"
 
 
 def preprocess(img: Image.Image) -> torch.Tensor:
+    """Resize to DINOv2-compatible dimensions and normalize."""
     transform = Compose([
         ToImage(),
-        Resize(size=(512, 1024), interpolation=InterpolationMode.BILINEAR),
+        Resize(
+            size=(config.INPUT_H, config.INPUT_W),
+            interpolation=InterpolationMode.BILINEAR,
+        ),
         ToDtype(dtype=torch.float32, scale=True),
         Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
     ])
@@ -38,17 +46,20 @@ def preprocess(img: Image.Image) -> torch.Tensor:
 
 
 def postprocess(pred: torch.Tensor, original_shape: tuple) -> np.ndarray:
+    """Argmax + resize back to original resolution."""
     pred_soft = nn.Softmax(dim=1)(pred)
     pred_max = torch.argmax(pred_soft, dim=1, keepdim=True)
-    prediction = Resize(size=original_shape,
-                        interpolation=InterpolationMode.NEAREST)(pred_max)
+    prediction = Resize(
+        size=original_shape, interpolation=InterpolationMode.NEAREST
+    )(pred_max)
     return prediction.cpu().detach().numpy().squeeze()
 
 
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    model = Model()
+    # Load model (pretrained=False because we load our own weights)
+    model = Model(pretrained=False)
     state_dict = torch.load(MODEL_PATH, map_location=device, weights_only=True)
     model.load_state_dict(state_dict, strict=True)
     model.eval().to(device)
