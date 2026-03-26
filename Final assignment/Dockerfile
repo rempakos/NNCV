@@ -10,13 +10,11 @@ RUN apt-get update && apt-get install -y \
     python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
-
 # create virtual environment
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-
-# install dependencies (add any additional dependencies your project requires)
+# install dependencies
 RUN pip install --no-cache-dir \
     torch torchvision --index-url https://download.pytorch.org/whl/cu126
 RUN pip install --no-cache-dir \
