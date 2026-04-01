@@ -1,27 +1,14 @@
-"""
-Dataset wrapper with robustness-oriented augmentations for Cityscapes.
-
-Includes standard augmentations (spatial, photometric, weather, corruption)
-plus two novel augmentations designed for this project:
-
-1. Frequency Band Dropout (see docstring below)
-2. Semantic Region Style Swap (see docstring below)
-"""
-
 import numpy as np
 import torch
 import albumentations as A
 import config
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# AUGMENTATION PIPELINES
-# ═══════════════════════════════════════════════════════════════════════
-# Note: sizes are config.INPUT_H × config.INPUT_W (518×1036) to match
-# DINOv2's patch_size=14 requirement.
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# AUGMENTATIONS
 
 train_transformation = A.Compose([
-    # ── Spatial ────────────────────────────────────────────────────
+    # Spatial
     A.RandomScale(scale_limit=(-0.5, 1.0), interpolation=1, p=1.0),
     A.PadIfNeeded(
         min_height=config.INPUT_H, min_width=config.INPUT_W,
@@ -30,7 +17,7 @@ train_transformation = A.Compose([
     A.RandomCrop(height=config.INPUT_H, width=config.INPUT_W, p=1.0),
     A.HorizontalFlip(p=0.5),
 
-    # ── Photometric ────────────────────────────────────────────────
+    # Photometric
     A.ColorJitter(
         brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1, p=0.5
     ),
@@ -40,7 +27,7 @@ train_transformation = A.Compose([
     A.CLAHE(clip_limit=4.0, tile_grid_size=(8, 8), p=0.2),
     A.RandomGamma(gamma_limit=(80, 120), p=0.2),
 
-    # ── Corruption-style ───────────────────────────────────────────
+    # Corruption-style
     A.OneOf([
         A.GaussNoise(var_limit=(10.0, 50.0), p=1.0),
         A.ISONoise(
@@ -54,7 +41,7 @@ train_transformation = A.Compose([
     ], p=0.3),
     A.ImageCompression(quality_lower=40, quality_upper=95, p=0.2),
 
-    # ── Weather-like ───────────────────────────────────────────────
+    # Weather-like
     A.OneOf([
         A.RandomFog(
             fog_coef_lower=0.1, fog_coef_upper=0.3,
@@ -79,7 +66,7 @@ train_transformation = A.Compose([
         ),
     ], p=0.25),
 
-    # ── Normalize (ImageNet stats, matching DINOv2 pretraining) ────
+    # Normalize (ImageNet stats, matching DINOv2 pretraining)
     A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
 ])
 
@@ -89,10 +76,10 @@ validation_transformation = A.Compose([
 ])
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# STANDARD CUSTOM AUGMENTATIONS
-# ═══════════════════════════════════════════════════════════════════════
+#@@@@@@@@@@@@@@@@@CUSTOM AUGMENTATIONS@@@@@@@@@@@@@@@@@@@@@
 
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#AUGMENTATION : COPY-PASTE OCCLUSION
 def occlusion_copy_paste(image, mask, dataset, probability=0.5):
     """
     Paste a random crop from another training image on top of the
@@ -139,27 +126,8 @@ def fast_fourier_transform(img1, img2, alpha=config.FOURIER_ALPHA):
     return np.clip(result * 255.0, 0, 255).astype(np.uint8)
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# NOVEL AUGMENTATION 1: FREQUENCY BAND DROPOUT
-# ═══════════════════════════════════════════════════════════════════════
-#
-# Motivation:
-#   CNNs and ViTs can over-rely on specific frequency ranges — textures
-#   (mid-high frequency), edges (high), or broad colour (low).
-#   Corruption benchmarks test exactly this: blur kills high frequencies,
-#   noise corrupts low frequencies, compression removes mid-range detail.
-#
-#   Existing augmentations each target ONE end of the spectrum.
-#   Frequency Band Dropout is *spectrum-agnostic*: it randomly removes
-#   arbitrary annular rings from the 2D Fourier magnitude, forcing the
-#   network to build features redundant across ALL frequency ranges.
-#
-#   If it has no effect, the image just looks mildly filtered — harmless.
-#   The key difference from standard Fourier augmentation (FDA) is that
-#   FDA transfers style from another image, while Frequency Band Dropout
-#   removes information entirely at random scales — a form of spectral
-#   regularisation with no donor image needed.
-#
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#AUGMENTATION : FREQUENCY BAND DROPOUT
 
 def frequency_band_dropout(image, band_width=0.15, max_bands=2):
     """
@@ -204,27 +172,8 @@ def frequency_band_dropout(image, band_width=0.15, max_bands=2):
     return np.clip(result * 255.0, 0, 255).astype(np.uint8)
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# NOVEL AUGMENTATION 2: SEMANTIC REGION STYLE SWAP
-# ═══════════════════════════════════════════════════════════════════════
-#
-# Motivation:
-#   Standard Fourier style transfer (FDA) swaps the global style of the
-#   entire image. But real-world corruptions are spatially varying: a
-#   shadowed road next to a sunlit building, fog at ground level but
-#   clear sky above.
-#
-#   This augmentation uses the semantic mask to independently transfer
-#   the colour statistics (mean+std histogram matching) of each class
-#   region from a different random donor image. The road gets one
-#   "style", the sky another, buildings a third.
-#
-#   This creates spatially-varying photometric inconsistency that global
-#   augmentations can never produce, directly training invariance to the
-#   kind of local corruptions that robustness benchmarks test.
-#
-#   If it fails, it's just a mild per-region colour shift — harmless.
-#
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#AUGMENTATION : SEMANTIC REGION STYLE SWAP
 
 def semantic_region_style_swap(image, mask, dataset, beta=0.25):
     """
@@ -277,15 +226,14 @@ def semantic_region_style_swap(image, mask, dataset, beta=0.25):
     return np.clip(result, 0, 255).astype(np.uint8)
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# DATASET WRAPPER
-# ═══════════════════════════════════════════════════════════════════════
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#DATASET WRAPPER
 
 class CityscapeAlbumentations(torch.utils.data.Dataset):
     """
     Wraps a Cityscapes dataset and applies the full augmentation pipeline:
-    copy-paste → Fourier blending → Freq Band Dropout → Semantic Style
-    Swap → albumentations (spatial + photometric + corruption).
+    copy-paste to Fourier blending to Freq Band Dropout to Semantic Style
+    Swap to albumentations (spatial + photometric + corruption).
     """
 
     def __init__(
@@ -309,14 +257,14 @@ class CityscapeAlbumentations(torch.utils.data.Dataset):
         image = np.array(image)
         mask = np.array(target)
 
-        # 1. Occlusion copy-paste
+        # Occlusion copy-paste
         if self.apply_copypaste:
             image, mask = occlusion_copy_paste(
                 image, mask, self.dataset,
                 probability=config.COPYPASTE_PROBABILITY,
             )
 
-        # 2. Fourier magnitude blending (global style transfer)
+        # Fourier magnitude blending (global style transfer)
         if self.apply_fourier and np.random.rand() < config.FOURIER_PROBABILITY:
             j = np.random.randint(0, len(self.dataset))
             img2, _ = self.dataset[j]
@@ -324,7 +272,7 @@ class CityscapeAlbumentations(torch.utils.data.Dataset):
                 image, np.array(img2), alpha=config.FOURIER_ALPHA
             )
 
-        # 3. Novel: Frequency Band Dropout
+        # Frequency Band Dropout
         if (self.apply_freq_band_dropout
                 and np.random.rand() < config.FREQ_BAND_DROPOUT_PROBABILITY):
             image = frequency_band_dropout(
@@ -333,7 +281,7 @@ class CityscapeAlbumentations(torch.utils.data.Dataset):
                 max_bands=config.FREQ_BAND_DROPOUT_MAX_BANDS,
             )
 
-        # 4. Novel: Semantic Region Style Swap
+        # Semantic Region Style Swap
         if (self.apply_semantic_style_swap
                 and np.random.rand() < config.SEMANTIC_STYLE_SWAP_PROBABILITY):
             image = semantic_region_style_swap(
@@ -341,7 +289,7 @@ class CityscapeAlbumentations(torch.utils.data.Dataset):
                 beta=config.SEMANTIC_STYLE_SWAP_BETA,
             )
 
-        # 5. Albumentations pipeline
+        # Albumentations pipeline
         if self.transform:
             transformed = self.transform(image=image, mask=mask)
             image = transformed["image"]

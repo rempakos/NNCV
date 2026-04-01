@@ -21,7 +21,8 @@ RUN pip install --no-cache-dir \
     pillow \
     albumentations \
     numpy \
-    opencv-python
+    opencv-python \
+    timm
 
 WORKDIR /app
 COPY predict.py /app/predict.py

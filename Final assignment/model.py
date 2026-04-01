@@ -1,19 +1,3 @@
-"""
-DINOv2 + Linear Decoder for semantic segmentation.
-
-Architecture follows the 1st-place BRAVO Challenge 2024 solution:
-a Vision Foundation Model (DINOv2) with a minimal linear segmentation
-head. The key insight is that DINOv2's self-supervised pretraining on
-a massive, diverse dataset produces representations that are inherently
-robust to distribution shifts — no complex decoder needed.
-
-References:
-  - Kerssies et al., "First Place Solution to the ECCV 2024 BRAVO
-    Challenge", arXiv:2409.17208
-  - Oquab et al., "DINOv2: Learning Robust Visual Features without
-    Supervision", arXiv:2304.07193
-"""
-
 import copy
 import torch
 import torch.nn as nn
@@ -29,19 +13,15 @@ class Model(nn.Module):
 
     The backbone outputs patch-level features of shape (B, N, D) where
     N = (H/P)*(W/P) patches. We reshape to a spatial grid, apply a
-    1×1 conv to map D→num_classes, and bilinearly upsample to the
+    1x1 conv to map D->num_classes, and bilinearly upsample to the
     input resolution.
-
-    A linear head is used intentionally: the BRAVO Challenge showed
-    that more complex decoders overfit to the training distribution
-    and *hurt* robustness.
     """
 
     def __init__(
         self,
         backbone_name=None,
         n_classes=None,
-        pretrained=True,
+        pretrained=False,
         input_h=None,
         input_w=None,
     ):
@@ -58,7 +38,7 @@ class Model(nn.Module):
         self.grid_h = self.input_h // self.patch_size
         self.grid_w = self.input_w // self.patch_size
 
-        # ── DINOv2 backbone via timm ──────────────────────────────
+        #DINOv2 backbone
         self.backbone = timm.create_model(
             backbone_name,
             pretrained=pretrained,
@@ -66,7 +46,7 @@ class Model(nn.Module):
             img_size=(self.input_h, self.input_w),
         )
 
-        # ── Linear segmentation head ──────────────────────────────
+        #Linear segmentation head
         # 1×1 conv is equivalent to a linear layer applied per patch
         self.head = nn.Sequential(
             nn.Conv2d(embed_dim, n_classes, kernel_size=1),
@@ -110,7 +90,7 @@ class Model(nn.Module):
         return logits
 
 
-# ── Exponential Moving Average ────────────────────────────────────────
+#Exponential Moving Average
 class EMA:
     """
     Maintains a smoothed copy of model weights for evaluation.

@@ -1,13 +1,3 @@
-"""
-Training script — DINOv2 + Linear Decoder on Cityscapes.
-
-Key design choices based on BRAVO Challenge 2024 findings:
-  • DINOv2 backbone provides inherently robust representations
-  • Linear decoder avoids overfitting to training distribution
-  • Differential LR: backbone 10× smaller than head
-  • Novel augmentations for additional robustness
-"""
-
 import os
 from argparse import ArgumentParser
 
@@ -15,7 +5,7 @@ import wandb
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from torchvision.datasets import Cityscapes
@@ -31,7 +21,7 @@ from dataset import (
 import config
 
 
-# ── Cityscapes label helpers ──────────────────────────────────────────
+#Cityscapes label helpers
 
 id_to_trainid = {cls.id: cls.train_id for cls in Cityscapes.classes}
 
@@ -57,7 +47,7 @@ def convert_train_id_to_color(prediction: torch.Tensor) -> torch.Tensor:
     return color
 
 
-# ── Per-class / supercategory metrics ─────────────────────────────────
+#Per-class / supercategory metrics
 
 def compute_metrics(preds, labels, n_classes=19, ignore_index=255):
     iou = np.zeros(n_classes)
@@ -100,7 +90,7 @@ def supercategory_metrics(iou, dice, valid):
     return results
 
 
-# ── Argument parser ───────────────────────────────────────────────────
+#Argument parser
 
 def get_args_parser():
     p = ArgumentParser("DINOv2 Cityscapes training")
@@ -124,7 +114,7 @@ def get_args_parser():
     return p
 
 
-# ── Main ──────────────────────────────────────────────────────────────
+#Main
 
 def main(args):
     wandb.init(
@@ -142,7 +132,7 @@ def main(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # ── Datasets ──────────────────────────────────────────────────
+    #Datasets
     train_raw = Cityscapes(
         args.data_dir, split="train", mode="fine", target_type="semantic"
     )
@@ -172,18 +162,17 @@ def main(args):
         pin_memory=True,
     )
 
-    # ── Model ─────────────────────────────────────────────────────
+    #Model
     model = Model(
         backbone_name=args.backbone,
         n_classes=config.N_CLASSES,
-        pretrained=True,
+        pretrained=True,  # Need pre-trained DINOv2 weights for training
     ).to(device)
 
     ema = EMA(model, decay=config.EMA_DECAY) if config.USE_EMA else None
 
-    # ── Optimizer with differential LR ────────────────────────────
-    # Backbone gets a much smaller LR than the head — following the
-    # BRAVO winner's approach.
+    #Optimizer with differential LR
+
     backbone_params = list(model.backbone.parameters())
     head_params = list(model.head.parameters())
 
@@ -192,13 +181,13 @@ def main(args):
         {"params": head_params, "lr": args.lr},
     ], weight_decay=args.weight_decay)
 
-    # ── Loss ──────────────────────────────────────────────────────
+    #Loss
     ce_loss_fn = nn.CrossEntropyLoss(ignore_index=255)
     dice_loss_fn = DiceLoss(mode="multiclass", ignore_index=255)
     ce_w = config.LOSS_WEIGHTS["cross_entropy"]
     dice_w = config.LOSS_WEIGHTS["dice"]
 
-    # ── Scheduler ─────────────────────────────────────────────────
+    #Scheduler
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer, max_lr=[
             args.lr * config.BACKBONE_LR_FACTOR,
@@ -210,12 +199,12 @@ def main(args):
         anneal_strategy="cos",
     )
 
-    scaler = GradScaler()
+    scaler = GradScaler("cuda")
     global_step = 0
     best_miou = 0.0
     best_model_path = None
 
-    # ── Training loop ─────────────────────────────────────────────
+    #Training loop
     for epoch in range(args.epochs):
         model.train()
         epoch_loss = 0.0
@@ -226,7 +215,7 @@ def main(args):
             labels = labels.to(device).long().squeeze(1)
 
             optimizer.zero_grad(set_to_none=True)
-            with autocast():
+            with autocast("cuda"):
                 logits = model(images)
                 loss = (ce_w * ce_loss_fn(logits, labels)
                         + dice_w * dice_loss_fn(logits, labels))
@@ -249,7 +238,7 @@ def main(args):
 
         avg_train = epoch_loss / len(train_loader)
 
-        # ── Validate ──────────────────────────────────────────────
+        #Validate
         eval_model = ema.module() if ema is not None else model
         eval_model.eval()
 
@@ -265,7 +254,7 @@ def main(args):
                 images = images.to(device)
                 labels = labels.to(device).long().squeeze(1)
 
-                with autocast():
+                with autocast("cuda"):
                     logits = eval_model(images)
                     loss = (ce_w * ce_loss_fn(logits, labels)
                             + dice_w * dice_loss_fn(logits, labels))
@@ -310,7 +299,7 @@ def main(args):
             f"mIoU={metrics['MeanIoU']:.4f}  mDice={metrics['MeanDice']:.4f}"
         )
 
-        # ── Checkpoint best model ─────────────────────────────
+        # Checkpoint best model
         if metrics["MeanIoU"] > best_miou:
             best_miou = metrics["MeanIoU"]
             if best_model_path and os.path.exists(best_model_path):
@@ -323,7 +312,7 @@ def main(args):
             torch.save(sd, best_model_path)
             print(f"  ↳ saved best (mIoU={best_miou:.4f})")
 
-    # ── Save final model ──────────────────────────────────────────
+    # Save final model
     final_sd = ema.state_dict() if ema is not None else model.state_dict()
     torch.save(final_sd, os.path.join(
         output_dir, f"final_model-epoch={epoch:04}-mIoU={metrics['MeanIoU']:.4f}.pt"

@@ -1,11 +1,3 @@
-"""
-Prediction pipeline for the trained DINOv2 segmentation model.
-Loads a pre-trained model, processes input images, and saves
-predicted segmentation masks.
-
-Compatible with the challenge submission server.
-"""
-
 from pathlib import Path
 
 import torch
@@ -25,7 +17,7 @@ from torchvision.transforms.v2 import (
 from model import Model
 import config
 
-# Fixed paths inside participant container
+#Fixed paths
 IMAGE_DIR = "/data"
 OUTPUT_DIR = "/output"
 MODEL_PATH = "/app/model.pt"
@@ -59,7 +51,7 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Load model (pretrained=False because we load our own weights)
-    model = Model(pretrained=False)
+    model = Model(pretrained=True)
     state_dict = torch.load(MODEL_PATH, map_location=device, weights_only=True)
     model.load_state_dict(state_dict, strict=True)
     model.eval().to(device)
