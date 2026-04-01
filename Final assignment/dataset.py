@@ -2,6 +2,9 @@ import numpy as np
 import torch
 import albumentations as A
 import config
+from torchvision.datasets import Cityscapes
+
+_IGNORE_RAW_IDS = {cls.id for cls in Cityscapes.classes if cls.train_id == 255}
 
 
 #@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -194,7 +197,7 @@ def semantic_region_style_swap(image, mask, dataset, beta=0.25):
     unique_classes = np.unique(mask)
 
     for cls_id in unique_classes:
-        if cls_id == 255:
+        if cls_id in _IGNORE_RAW_IDS:
             continue
 
         region = mask == cls_id
