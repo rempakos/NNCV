@@ -13,7 +13,7 @@ python3 train.py \
     --seed 42 \
     --backbone "vit_base_patch14_dinov2.lvd142m" \
     --experiment-id "dinov2-linear-robust-v1" \
-    --apply-fourier false \
-    --apply-copypaste false \
-    --apply-freq-band-dropout false \
-    --apply-semantic-style-swap false
+    --apply-fourier true \
+    --apply-copypaste true \
+    --apply-freq-band-dropout true \
+    --apply-semantic-style-swap true
