@@ -91,6 +91,9 @@ def occlusion_copy_paste(image, mask, dataset, probability=0.5):
     if np.random.rand() >= probability:
         return image, mask
 
+    image = image.copy()
+    mask = mask.copy()
+
     idx = np.random.randint(0, len(dataset))
     img2, mask2 = dataset[idx]
     img2, mask2 = np.array(img2), np.array(mask2)
