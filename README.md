@@ -137,9 +137,13 @@ source venv/bin/activate  # Linux/macOS
 bash main.sh
 ```
 
-This installs dependencies from `requirements.txt`, prompts for wandb login, and trains with all augmentations enabled (Fourier, CopyPaste, FreqBandDropout, SemanticStyleSwap) using config defaults.
+This installs dependencies, prompts for wandb login, and trains with parameters from `main.sh` which match `config.py` defaults (80 epochs, batch size 4, all augmentations enabled). Note: `main.sh` parameters supercede `config.py` values.
 
-**Option 2**: Manual training (customize parameters):
+To modify training parameters, either:
+- Edit `main.sh` before running (change `--epochs`, `--batch-size`, etc.)
+- Edit `config.py` and run `python train.py` directly
+
+**Option 2**: Manual training (direct control):
 
 All hyperparameters are defined in `config.py`. Run directly with:
 
@@ -147,11 +151,13 @@ All hyperparameters are defined in `config.py`. Run directly with:
 python train.py --experiment-id my-exp
 ```
 
-To override config values:
+To override config values via command line:
 
 ```bash
 python train.py --epochs 1 --batch-size 2 --experiment-id test
 ```
+
+Or edit `config.py` directly and then run `python train.py`.
 
 **Augmentations**: Edit `config.py` to enable/disable:
 
