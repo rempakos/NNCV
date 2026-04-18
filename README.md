@@ -175,9 +175,10 @@ Change line with `Model(pretrained=True)` to `Model(pretrained=False)` !!!
 model = Model(pretrained=False)  # Already trained, don't download weights
 ```
 
-**IMPORTANT**: 
+**IMPORTANT**:
+
 - `pretrained=True` is needed during training to load pre-trained DINOv2 weights from HuggingFace
-- **MUST be `False` for submission** because the submission server cannot access HuggingFace. Your trained `model.pt` already contains all weights.
+- **MUST be `False` for submission** because the submission server cannot access HuggingFace. Instead, `model.pt` already contains all weights.
 
 **Step 2**: Copy your best trained checkpoint as `model.pt`:
 
