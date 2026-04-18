@@ -4,4 +4,6 @@ WANDB_DIR=<path-to-wandb-directory>
 WANDB_CONFIG_DIR=<path-to-wandb-directory>
 WANDB_CACHE_DIR=<path-to-wandb-directory>
 WANDB_START_METHOD="thread"
-HF_TOKEN = <your-huggingface-api-key>
+
+# HuggingFace Token (for dataset download)
+HF_TOKEN=<your-huggingface-api-key>
