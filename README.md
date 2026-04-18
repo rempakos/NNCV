@@ -106,6 +106,21 @@ DATA_DIR = "./data/cityscapes"  # Update if needed
 
 ## 3. Training
 
+### On HPC Clusters (Snellius):
+
+Use SLURM job submission instead of running directly:
+
+```bash
+sbatch jobscript_slurm.sh
+```
+
+Check job status:
+```bash
+squeue -u scur2416
+```
+
+### On Local Machine:
+
 **Option 1**: Use training script (recommended):
 
 Activate environment and run:
