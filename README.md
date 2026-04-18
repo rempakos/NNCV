@@ -35,26 +35,30 @@ Verify: `python -c "import torch; import timm; print('OK')"`
 
 ## 1a. Setup Environment Variables
 
-Copy the template file and fill in your credentials:
+Adjust the `env.txt` file with your credentials and rename it to `.env`:
 
 ```bash
-cp _env .env
+# Edit env.txt with your API keys
+# Then rename it to .env (this file is gitignored for security)
+mv env.txt .env  # or rename env.txt .env on Windows
 ```
 
-Then edit `.env` and add your actual API keys:
+The `.env` file should contain:
 
 ```env
 # Weights and Biases API
-WANDB_API_KEY=your_wandb_api_key
-WANDB_DIR=/path/to/wandb/logs
+WANDB_API_KEY=<your-wandb-api-key>
+WANDB_DIR=<path-to-wandb-directory>
+WANDB_CONFIG_DIR=<path-to-wandb-directory>
+WANDB_CACHE_DIR=<path-to-wandb-directory>
 WANDB_START_METHOD="thread"
 
 # HuggingFace Token (for dataset download)
-HF_TOKEN=your_huggingface_token
+HF_TOKEN=<your-huggingface-api-key>
 ```
 
 **Required**: `HF_TOKEN` (for downloading dataset from HuggingFace)  
-**Optional**: `WANDB_API_KEY` (can login interactively during training)
+**Optional**: `WANDB_*` variables (can login interactively during training)
 
 ## 1b. Setup W&B (Weights & Biases)
 
