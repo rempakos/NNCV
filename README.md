@@ -8,6 +8,19 @@
 
 Baseline model (UNet for comparison): [https://github.com/TUE-ARIA/NNCV](https://github.com/TUE-ARIA/NNCV)
 
+## 0. Clone the Repository
+
+```bash
+git clone https://github.com/rempakos/NNCV.git
+cd NNCV
+```
+
+Or for local development, use your fork:
+```bash
+git clone https://github.com/YOUR-USERNAME/NNCV.git
+cd NNCV
+```
+
 ## 1. Install Environment
 
 ```bash
