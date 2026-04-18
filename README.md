@@ -114,11 +114,6 @@ Use SLURM job submission instead of running directly:
 sbatch jobscript_slurm.sh
 ```
 
-Check job status:
-```bash
-squeue -u scur2416
-```
-
 ### On Local Machine:
 
 **Option 1**: Use training script (recommended):
