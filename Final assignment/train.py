@@ -1,246 +1,327 @@
-"""
-This script implements a training loop for the model. It is designed to be flexible, 
-allowing you to easily modify hyperparameters using a command-line argument parser.
-
-### Key Features:
-1. **Hyperparameter Tuning:** Adjust hyperparameters by parsing arguments from the `main.sh` script or directly 
-   via the command line.
-2. **Remote Execution Support:** Since this script runs on a server, training progress is not visible on the console. 
-   To address this, we use the `wandb` library for logging and tracking progress and results.
-3. **Encapsulation:** The training loop is encapsulated in a function, enabling it to be called from the main block. 
-   This ensures proper execution when the script is run directly.
-
-Feel free to customize the script as needed for your use case.
-"""
 import os
 from argparse import ArgumentParser
 
 import wandb
+import numpy as np
 import torch
 import torch.nn as nn
+from torch.amp import GradScaler, autocast
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from torchvision.datasets import Cityscapes
 from torchvision.utils import make_grid
-from torchvision.transforms.v2 import (
-    Compose,
-    Normalize,
-    Resize,
-    ToImage,
-    ToDtype,
-    InterpolationMode
+from segmentation_models_pytorch.losses import DiceLoss
+
+from model import Model, EMA
+from dataset import (
+    CityscapeAlbumentations,
+    train_transformation,
+    validation_transformation,
 )
+import config
 
-from model import Model
 
+#Cityscapes label helpers
 
-# Mapping class IDs to train IDs
 id_to_trainid = {cls.id: cls.train_id for cls in Cityscapes.classes}
-def convert_to_train_id(label_img: torch.Tensor) -> torch.Tensor:
-    return label_img.apply_(lambda x: id_to_trainid[x])
 
-# Mapping train IDs to color
-train_id_to_color = {cls.train_id: cls.color for cls in Cityscapes.classes if cls.train_id != 255}
-train_id_to_color[255] = (0, 0, 0)  # Assign black to ignored labels
+
+def convert_to_train_id(label_img: torch.Tensor) -> torch.Tensor:
+    return label_img.apply_(lambda x: id_to_trainid.get(x, 255))
+
+
+train_id_to_color = {
+    cls.train_id: cls.color
+    for cls in Cityscapes.classes if cls.train_id != 255
+}
+train_id_to_color[255] = (0, 0, 0)
+
 
 def convert_train_id_to_color(prediction: torch.Tensor) -> torch.Tensor:
-    batch, _, height, width = prediction.shape
-    color_image = torch.zeros((batch, 3, height, width), dtype=torch.uint8)
+    b, _, h, w = prediction.shape
+    color = torch.zeros((b, 3, h, w), dtype=torch.uint8)
+    for tid, c in train_id_to_color.items():
+        m = prediction[:, 0] == tid
+        for ch in range(3):
+            color[:, ch][m] = c[ch]
+    return color
 
-    for train_id, color in train_id_to_color.items():
-        mask = prediction[:, 0] == train_id
 
-        for i in range(3):
-            color_image[:, i][mask] = color[i]
+#Per-class / supercategory metrics
 
-    return color_image
+def compute_metrics(preds, labels, n_classes=19, ignore_index=255):
+    iou = np.zeros(n_classes)
+    dice = np.zeros(n_classes)
+    valid = np.zeros(n_classes, dtype=bool)
 
+    preds_np = preds.cpu().numpy()
+    labels_np = labels.cpu().numpy()
+
+    for c in range(n_classes):
+        pred_c = (preds_np == c) & (labels_np != ignore_index)
+        true_c = (labels_np == c) & (labels_np != ignore_index)
+
+        intersection = (pred_c & true_c).sum()
+        union = (pred_c | true_c).sum()
+        sum_both = pred_c.sum() + true_c.sum()
+
+        if true_c.sum() == 0 and pred_c.sum() == 0:
+            continue
+
+        valid[c] = True
+        iou[c] = intersection / (union + 1e-8)
+        dice[c] = 2 * intersection / (sum_both + 1e-8)
+
+    return iou, dice, valid
+
+
+def supercategory_metrics(iou, dice, valid):
+    results = {}
+    for cat, ids in config.SUPERCATEGORY_MAP.items():
+        mask = np.array([valid[c] for c in ids])
+        if mask.any():
+            results[f"IoU_{cat}"] = np.mean([iou[c] for c in ids if valid[c]])
+            results[f"Dice_{cat}"] = np.mean([dice[c] for c in ids if valid[c]])
+        else:
+            results[f"IoU_{cat}"] = 0.0
+            results[f"Dice_{cat}"] = 0.0
+    results["MeanIoU"] = np.mean(iou[valid]) if valid.any() else 0.0
+    results["MeanDice"] = np.mean(dice[valid]) if valid.any() else 0.0
+    return results
+
+
+#Argument parser
 
 def get_args_parser():
+    p = ArgumentParser("DINOv2 Cityscapes training")
+    p.add_argument("--data-dir", type=str, default=config.DATA_DIR)
+    p.add_argument("--batch-size", type=int, default=config.BATCH_SIZE)
+    p.add_argument("--epochs", type=int, default=config.EPOCHS)
+    p.add_argument("--lr", type=float, default=config.LEARNING_RATE)
+    p.add_argument("--weight-decay", type=float, default=config.WEIGHT_DECAY)
+    p.add_argument("--num-workers", type=int, default=config.NUM_WORKERS)
+    p.add_argument("--seed", type=int, default=config.SEED)
+    p.add_argument("--experiment-id", type=str, default=config.EXPERIMENT_ID)
+    p.add_argument("--backbone", type=str, default=config.BACKBONE)
 
-    parser = ArgumentParser("Training script for a PyTorch U-Net model")
-    parser.add_argument("--data-dir", type=str, default="./data/cityscapes", help="Path to the training data")
-    parser.add_argument("--batch-size", type=int, default=64, help="Training batch size")
-    parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
-    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
-    parser.add_argument("--num-workers", type=int, default=10, help="Number of workers for data loaders")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
-    parser.add_argument("--experiment-id", type=str, default="unet-training", help="Experiment ID for Weights & Biases")
+    bool_flag = lambda x: str(x).lower() == "true"
+    p.add_argument("--apply-fourier", type=bool_flag, default=config.APPLY_FOURIER)
+    p.add_argument("--apply-copypaste", type=bool_flag, default=config.APPLY_COPYPASTE)
+    p.add_argument("--apply-freq-band-dropout", type=bool_flag,
+                   default=config.APPLY_FREQ_BAND_DROPOUT)
+    p.add_argument("--apply-semantic-style-swap", type=bool_flag,
+                   default=config.APPLY_SEMANTIC_STYLE_SWAP)
+    return p
 
-    return parser
 
+#Main
 
 def main(args):
-    # Initialize wandb for logging
     wandb.init(
-        project="5lsm0-cityscapes-segmentation",  # Project name in wandb
-        name=args.experiment_id,  # Experiment name in wandb
-        config=vars(args),  # Save hyperparameters
+        project=config.WANDB_PROJECT, name=args.experiment_id,
+        config=vars(args),
     )
 
-    # Create output directory if it doesn't exist
-    output_dir = os.path.join("checkpoints", args.experiment_id)
+    output_dir = os.path.join(config.CHECKPOINT_DIR, args.experiment_id)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Set seed for reproducability
-    # If you add other sources of randomness (NumPy, Random), 
-    # make sure to set their seeds as well
     torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
     torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
-    # Define the device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Define the transforms to apply to the data
-    img_transform = Compose([
-    ToImage(),
-    Resize((256, 256)),
-    ToDtype(torch.float32, scale=True),
-    Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    ])
-
-    # Target transform (mask)
-    target_transform = Compose([
-        ToImage(),
-        Resize((256, 256), interpolation=InterpolationMode.NEAREST),
-        ToDtype(torch.int64),  # no scaling
-    ])
-
-    # Load the dataset and make a split for training and validation
-    train_dataset = Cityscapes(
-    args.data_dir,
-    split="train",
-    mode="fine",
-    target_type="semantic",
-    transform=img_transform,
-    target_transform=target_transform,
+    #Datasets
+    train_raw = Cityscapes(
+        args.data_dir, split="train", mode="fine", target_type="semantic"
+    )
+    valid_raw = Cityscapes(
+        args.data_dir, split="val", mode="fine", target_type="semantic"
     )
 
-    valid_dataset = Cityscapes(
-        args.data_dir,
-        split="val",
-        mode="fine",
-        target_type="semantic",
-        transform=img_transform,
-        target_transform=target_transform,
+    train_dataset = CityscapeAlbumentations(
+        train_raw, transform=train_transformation,
+        apply_fourier=args.apply_fourier,
+        apply_copypaste=args.apply_copypaste,
+        apply_freq_band_dropout=args.apply_freq_band_dropout,
+        apply_semantic_style_swap=args.apply_semantic_style_swap,
+    )
+    valid_dataset = CityscapeAlbumentations(
+        valid_raw, transform=validation_transformation,
     )
 
-    train_dataloader = DataLoader(
-        train_dataset, 
-        batch_size=args.batch_size, 
-        shuffle=True,
-        num_workers=args.num_workers
+    train_loader = DataLoader(
+        train_dataset, batch_size=args.batch_size,
+        shuffle=True, num_workers=args.num_workers,
+        pin_memory=True, drop_last=True,
     )
-    valid_dataloader = DataLoader(
-        valid_dataset, 
-        batch_size=args.batch_size, 
-        shuffle=False,
-        num_workers=args.num_workers
+    valid_loader = DataLoader(
+        valid_dataset, batch_size=args.batch_size,
+        shuffle=False, num_workers=args.num_workers,
+        pin_memory=True,
     )
 
-    # Define the model
+    #Model
     model = Model(
-        in_channels=3,  # RGB images
-        n_classes=19,  # 19 classes in the Cityscapes dataset
+        backbone_name=args.backbone,
+        n_classes=config.N_CLASSES,
+        pretrained=True,  # Need pre-trained DINOv2 weights for training
     ).to(device)
 
-    # Define the loss function
-    criterion = nn.CrossEntropyLoss(ignore_index=255)  # Ignore the void class
+    ema = EMA(model, decay=config.EMA_DECAY) if config.USE_EMA else None
 
-    # Define the optimizer
-    optimizer = AdamW(model.parameters(), lr=args.lr)
+    #Optimizer with differential LR
 
-    # Training loop
-    best_valid_loss = float('inf')
-    current_best_model_path = None
+    backbone_params = list(model.backbone.parameters())
+    head_params = list(model.head.parameters())
+
+    optimizer = AdamW([
+        {"params": backbone_params, "lr": args.lr * config.BACKBONE_LR_FACTOR},
+        {"params": head_params, "lr": args.lr},
+    ], weight_decay=args.weight_decay)
+
+    #Loss
+    ce_loss_fn = nn.CrossEntropyLoss(ignore_index=255)
+    dice_loss_fn = DiceLoss(mode="multiclass", ignore_index=255)
+    ce_w = config.LOSS_WEIGHTS["cross_entropy"]
+    dice_w = config.LOSS_WEIGHTS["dice"]
+
+    #Scheduler
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer, max_lr=[
+            args.lr * config.BACKBONE_LR_FACTOR,
+            args.lr,
+        ],
+        steps_per_epoch=len(train_loader),
+        epochs=args.epochs,
+        pct_start=0.05,
+        anneal_strategy="cos",
+    )
+
+    scaler = GradScaler("cuda")
+    global_step = 0
+    best_miou = 0.0
+    best_model_path = None
+
+    #Training loop
     for epoch in range(args.epochs):
-        print(f"Epoch {epoch+1:04}/{args.epochs:04}")
-
-        # Training
         model.train()
-        for i, (images, labels) in enumerate(train_dataloader):
+        epoch_loss = 0.0
 
-            labels = convert_to_train_id(labels)  # Convert class IDs to train IDs
-            images, labels = images.to(device), labels.to(device)
+        for images, labels in train_loader:
+            labels = convert_to_train_id(labels)
+            images = images.to(device)
+            labels = labels.to(device).long().squeeze(1)
 
-            labels = labels.long().squeeze(1)  # Remove channel dimension
+            optimizer.zero_grad(set_to_none=True)
+            with autocast("cuda"):
+                logits = model(images)
+                loss = (ce_w * ce_loss_fn(logits, labels)
+                        + dice_w * dice_loss_fn(logits, labels))
 
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+            scheduler.step()
 
+            if ema is not None:
+                ema.update(model)
+
+            epoch_loss += loss.item()
             wandb.log({
                 "train_loss": loss.item(),
-                "learning_rate": optimizer.param_groups[0]['lr'],
-                "epoch": epoch + 1,
-            }, step=epoch * len(train_dataloader) + i)
-            
-        # Validation
-        model.eval()
+                "lr_backbone": optimizer.param_groups[0]["lr"],
+                "lr_head": optimizer.param_groups[1]["lr"],
+            }, step=global_step)
+            global_step += 1
+
+        avg_train = epoch_loss / len(train_loader)
+
+        #Validate
+        eval_model = ema.module() if ema is not None else model
+        eval_model.eval()
+
+        val_losses = []
+        all_iou = np.zeros(config.N_CLASSES)
+        all_dice = np.zeros(config.N_CLASSES)
+        all_valid = np.zeros(config.N_CLASSES, dtype=bool)
+        n_batches = 0
+
         with torch.no_grad():
-            losses = []
-            for i, (images, labels) in enumerate(valid_dataloader):
+            for i, (images, labels) in enumerate(valid_loader):
+                labels = convert_to_train_id(labels)
+                images = images.to(device)
+                labels = labels.to(device).long().squeeze(1)
 
-                labels = convert_to_train_id(labels)  # Convert class IDs to train IDs
-                images, labels = images.to(device), labels.to(device)
+                with autocast("cuda"):
+                    logits = eval_model(images)
+                    loss = (ce_w * ce_loss_fn(logits, labels)
+                            + dice_w * dice_loss_fn(logits, labels))
+                val_losses.append(loss.item())
 
-                labels = labels.long().squeeze(1)  # Remove channel dimension
-
-                outputs = model(images)
-                loss = criterion(outputs, labels)
-                losses.append(loss.item())
-            
-                if i == 0:
-                    predictions = outputs.softmax(1).argmax(1)
-
-                    predictions = predictions.unsqueeze(1)
-                    labels = labels.unsqueeze(1)
-
-                    predictions = convert_train_id_to_color(predictions)
-                    labels = convert_train_id_to_color(labels)
-
-                    predictions_img = make_grid(predictions.cpu(), nrow=8)
-                    labels_img = make_grid(labels.cpu(), nrow=8)
-
-                    predictions_img = predictions_img.permute(1, 2, 0).numpy()
-                    labels_img = labels_img.permute(1, 2, 0).numpy()
-
-                    wandb.log({
-                        "predictions": [wandb.Image(predictions_img)],
-                        "labels": [wandb.Image(labels_img)],
-                    }, step=(epoch + 1) * len(train_dataloader) - 1)
-            
-            valid_loss = sum(losses) / len(losses)
-            wandb.log({
-                "valid_loss": valid_loss
-            }, step=(epoch + 1) * len(train_dataloader) - 1)
-
-            if valid_loss < best_valid_loss:
-                best_valid_loss = valid_loss
-                if current_best_model_path:
-                    os.remove(current_best_model_path)
-                current_best_model_path = os.path.join(
-                    output_dir, 
-                    f"best_model-epoch={epoch:04}-val_loss={valid_loss:04}.pt"
+                preds = logits.softmax(1).argmax(1)
+                iou, dice, valid = compute_metrics(
+                    preds, labels, config.N_CLASSES
                 )
-                torch.save(model.state_dict(), current_best_model_path)
-        
-    print("Training complete!")
+                all_iou += iou
+                all_dice += dice
+                all_valid |= valid
+                n_batches += 1
 
-    # Save the model
-    torch.save(
-        model.state_dict(),
-        os.path.join(
-            output_dir,
-            f"final_model-epoch={epoch:04}-val_loss={valid_loss:04}.pt"
+                # Log visual predictions for first batch
+                if i == 0:
+                    pred_vis = convert_train_id_to_color(preds.unsqueeze(1))
+                    lbl_vis = convert_train_id_to_color(labels.unsqueeze(1))
+                    wandb.log({
+                        "predictions": [wandb.Image(
+                            make_grid(pred_vis.cpu(), nrow=4)
+                            .permute(1, 2, 0).numpy()
+                        )],
+                        "labels": [wandb.Image(
+                            make_grid(lbl_vis.cpu(), nrow=4)
+                            .permute(1, 2, 0).numpy()
+                        )],
+                    }, step=global_step - 1)
+
+        avg_iou = all_iou / max(n_batches, 1)
+        avg_dice = all_dice / max(n_batches, 1)
+        metrics = supercategory_metrics(avg_iou, avg_dice, all_valid)
+        avg_val_loss = sum(val_losses) / len(val_losses)
+
+        log_dict = {"valid_loss": avg_val_loss, "epoch": epoch + 1}
+        log_dict.update(metrics)
+        wandb.log(log_dict, step=global_step - 1)
+
+        print(
+            f"Epoch {epoch+1:03}/{args.epochs}  "
+            f"train={avg_train:.4f}  val={avg_val_loss:.4f}  "
+            f"mIoU={metrics['MeanIoU']:.4f}  mDice={metrics['MeanDice']:.4f}"
         )
-    )
+
+        # Checkpoint best model
+        if metrics["MeanIoU"] > best_miou:
+            best_miou = metrics["MeanIoU"]
+            if best_model_path and os.path.exists(best_model_path):
+                os.remove(best_model_path)
+            best_model_path = os.path.join(
+                output_dir,
+                f"best_model-epoch={epoch:04}-mIoU={best_miou:.4f}.pt",
+            )
+            sd = ema.state_dict() if ema is not None else model.state_dict()
+            torch.save(sd, best_model_path)
+            print(f"  ↳ saved best (mIoU={best_miou:.4f})")
+
+    # Save final model
+    final_sd = ema.state_dict() if ema is not None else model.state_dict()
+    torch.save(final_sd, os.path.join(
+        output_dir, f"final_model-epoch={epoch:04}-mIoU={metrics['MeanIoU']:.4f}.pt"
+    ))
+
+    print("Training complete!")
     wandb.finish()
 
 
 if __name__ == "__main__":
-    parser = get_args_parser()
-    args = parser.parse_args()
+    args = get_args_parser().parse_args()
     main(args)

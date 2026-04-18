@@ -15,8 +15,10 @@ __pycache__/
 results/
 outputs/
 runs/
+wandb/
 *.log
 *.npy
 *.npz
 slurm-*.out
 .DS_Store
+*.tar

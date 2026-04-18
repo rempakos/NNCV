@@ -1,85 +1,403 @@
-# Final Assignment: Cityscape Challenge  
+# Setup Instructions
 
-Welcome to the **Cityscape Challenge**, the final project for this course!  
+## Prerequisites
 
-In this assignment, you'll put your knowledge of Neural Networks (NNs) for computer vision into action by tackling real-world problems using the **CityScapes dataset**. This dataset contains large-scale, high-quality images of urban environments, making it perfect for tasks like **semantic segmentation** and **object detection**.  
+- Python 3.11+
+- ~10GB disk space
+- Optional: Docker for submission, CUDA 12.1 for GPU training
 
-This challenge is designed to push your skills further, focusing on practical and often under-explored issues crucial for deploying computer vision models in real-world scenarios.  
+Baseline model (UNet for comparison): [https://github.com/TUE-ARIA/NNCV](https://github.com/TUE-ARIA/NNCV)
 
----
+## 1. Install Environment
 
-## Benchmarks  
+```bash
+python -m venv venv
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/macOS
+pip install -r requirements.txt
+```
 
-The competition comprises four benchmarks, each targeting a specific aspect of model performance:  
+Or with Conda:
 
-1. **Peak performance**  
-   This benchmark evaluates your model's segmentation accuracy on a clean, standardized test set. Your goal is to achieve the highest segmentation scores here. **Everyone should submit a model to this benchmark optimized for maximum performance**. However, it's crucial to implement changes thoughtfully and be able to justify them in your research paper. Ultimately, the focus should be on the scientific contributions of your adaptations rather than solely aiming for the highest score.
+```bash
+conda env create -f environment.yml
+conda activate nncv-final-assignment
+```
 
-The following benchmarks 2–4 are optional, and **you should select one** to compare against the Peak Performance benchmark. This allows you to analyze how your model performs under different conditions and gain deeper insights beyond just optimizing for the highest score.
+Verify: `python -c "import torch; import timm; print('OK')"`
 
-2. **Robustness**  
-   This benchmark tests how well your model performs under challenging conditions, such as changes in lighting, weather, or image quality. Consistency is key in this category.  
+## 1b. Setup W&B (Weights & Biases)
 
-3. **Efficiency**  
-   Practical applications often require compact models. This benchmark emphasizes creating smaller models that maintain acceptable performance. It’s particularly relevant for edge devices where large models are infeasible.  
+Create a free account at [wandb.ai](https://wandb.ai) and get your API key from settings.
 
-4. **Out-of-distribution detection**  
-   Models often encounter data that differs from the training distribution, leading to unreliable predictions. This benchmark evaluates your model's ability to detect and handle such out-of-distribution samples.  
+When you run training (via `bash main.sh` or `python train.py`), you'll be prompted to login:
 
-> **IMPORTANT NOTE**: The **Peak Permomance** benchmark will also serve as the baseline server, and all participants must submit a baseline model here. This means that you can just train the already provided model in the repo. The training code for this model is also already provided. The baseline submission serves two purposes: ensuring that everyone is familiar with working on an HPC cluster and providing a reference point for evaluating the impact of different adaptations in your other benchmark submissions (you need to show these improvements compared to the baseline in your report!). The Baseline benchmark will close on **Tuesday, March 17, at 11:59 P.M. (GMT+1)**. To avoid last-minute issues, start preparing your submission early. This will also give you time to ask questions during the scheduled computer classes if needed.
+```bash
+wandb login
+# Paste your API key when prompted
+```
 
----
+This logs your training metrics to your W&B project.
 
-## Deliverables  
+## 2. Download Dataset
 
-Your final submission will consist of the following:  
+### Option A: From HuggingFace (If you have course credentials)
 
-### 1. Research paper  
-Write a **3-4 page research paper** in [IEEE double-column format](https://www.overleaf.com/latex/templates/ieee-conference-template/grfzhhncsfqn), addressing (at least) the following:  
+```bash
+hf auth login --token your-hf-token
+hf download TimJaspersUe/5LSM0 --local-dir ./data --repo-type dataset
+```
 
-- **Abstract**: Summarize the current problems, your key steps for addressing them and your main findings in about 100-300 words.
-- **Introduction**: Present the problem, challenges, and potential solutions based on existing literature.  
-- **Methods**: Describe your dataset(s), outline the baseline approach using an off-the-shelf segmentation model and define the enhancements you made for the specific benchmarks you participated.  
-- **Results**: Show and describe your results based on performance metrics and examples. Use figures and tables to support your findings. 
-- **Discussion**: Discuss the impact and potential of your main findings. Also discuss limitations and suggest future improvements.
+### Option B: Manual Setup
 
-> **Submission**: Submit your paper as a PDF document via **Canvas**.
+If you cannot download from HuggingFace, prepare Cityscapes locally with this structure:
 
-The paper will be graded based on clarity, experimental design, insight, and originality.  
+```
+data/
+├── cityscapes/
+│   ├── leftImg8bit/
+│   │   ├── train/
+│   │   └── val/
+│   └── gtFine/
+│       ├── train/
+│       └── val/
+```
 
-### 2. Code repository  
-Push all relevant code to a **public GitHub repository** with a README.md file detailing:  
-- Required libraries and installation instructions.  
-- Steps to run your code.  
-- Your Codalab username and TU/e email address for correct mapping across systems.  
+Ensure `config.py` points to the correct dataset path:
 
-### 3. Challenge platform submissions  
-The Cityscape Challenge will be hosted on a **dedicated course compute platform** (instead of Codalab used in previous years).
+```python
+DATA_DIR = "./data/cityscapes"  # Update if needed
+```
 
-You will receive clear, step-by-step instructions for making submission once the final assignment begins.
+## 3. Training
 
----
+**Option 1**: Use training script (recommended):
 
-## Grading and Bonus Points  
+Activate environment and run:
 
-The final assignment accounts for **50% of your course grade**. Additionally, bonus points are available:  
+```bash
+# Activate environment
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/macOS
 
-- **Top 3 in any benchmark**: +0.25 to your final assignment grade.  
-- **Best performance in any benchmark**: +0.5 to your final assignment grade.  
+# Run training script
+bash main.sh
+```
 
-For example, achieving the best performance in 'Peak Performance' and a top 3 spot in another benchmark will earn you a 0.75 bonus.  
+This installs dependencies from `requirements.txt`, prompts for wandb login, and trains with all augmentations enabled (Fourier, CopyPaste, FreqBandDropout, SemanticStyleSwap) using config defaults.
 
-> **Note**: The bonus is optional. A great report with an innovative solution that doesn't rank highly can still earn a perfect score (10).  
+**Option 2**: Manual training (customize parameters):
 
----
+All hyperparameters are defined in `config.py`. Run directly with:
 
-## Important Notes  
+```bash
+python train.py --experiment-id my-exp
+```
 
-- Ensure a proper **train-validation split** of the CityScapes dataset.  
-- Training your model may take multiple hours; plan accordingly.  
-- Use ideas from literature but remember to **cite all sources**. Plagiarism will not be tolerated.  
-- For questions or challenges, use the **Discussions** section of this repository to collaborate with peers.  
+To override config values:
 
----
+```bash
+python train.py --epochs 1 --batch-size 2 --experiment-id test
+```
 
-We wish you the best of luck in this challenge and are excited to see the innovative solutions you develop! 🚀
+**Augmentations**: Edit `config.py` to enable/disable:
+
+- `APPLY_FOURIER` - Fourier space augmentation
+- `APPLY_COPYPASTE` - Copy-paste augmentation
+- `APPLY_FREQ_BAND_DROPOUT` - Frequency band dropout
+- `APPLY_SEMANTIC_STYLE_SWAP` - Semantic style transfer
+
+Checkpoints: `checkpoints/<experiment-id>/`
+
+## 4. Visualization & Comparison
+
+**Compare models** (requires 3 pre-trained models in `models/` folder):
+
+Models expected at:
+
+```
+models/
+├── baseline/model.pt
+├── dino_model_without_augmentation/model.pt
+└── dino_model_with_augmentation/model.pt
+```
+
+Compare predictions on sample images:
+
+```bash
+python compare_models.py --image sample_data/aachen_000000_000019_leftImg8bit.png --output comparison.png
+```
+
+Available sample images: `sample_data/aachen_000000_000019_leftImg8bit.png` through `aachen_000051_000019_leftImg8bit.png`
+
+Or use custom image:
+
+```bash
+python compare_models.py --image /path/to/your/image.png --output comparison.png
+```
+
+**Visualize single model** (trained checkpoint):
+
+```bash
+python visualize.py --checkpoint checkpoints/my-exp/model.pt --image sample_data/aachen_000000_000019_leftImg8bit.png
+```
+
+## 5. Docker Submission
+
+**Step 1**: Prepare for submission - edit `predict.py`:
+
+Change line with `Model(pretrained=True)` to `Model(pretrained=False)`:
+
+```python
+model = Model(pretrained=False)  # Already trained, don't download weights
+```
+
+This prevents the container from trying to download DINOv2 weights from HuggingFace (which fails on submission server). Your trained `model.pt` already contains all weights.
+
+**Step 2**: Copy your best trained checkpoint as `model.pt`:
+
+```bash
+cp checkpoints/my-exp/best_model.pt model.pt
+```
+
+**Step 3**: Build Docker image:
+
+```bash
+docker build --no-cache -t my-submission:latest .
+```
+
+**Step 4**: Test locally before submission:
+
+```bash
+mkdir local_data local_output
+
+# Copy test images
+cp sample_data/*.png local_data/
+
+# Run Docker container
+docker run --rm -v "${PWD}\local_data:/data" -v "${PWD}\local_output:/output" my-submission:latest
+```
+
+Check that segmentation masks were created in `local_output/` with same filenames as inputs.
+
+**Step 5**: Export for submission:
+
+```bash
+docker save my-submission:latest -o my-submission.tar
+```
+
+## Notes
+
+- Training without GPU is very slow
+- Check GPU: `python -c "import torch; print(torch.cuda.is_available())"`
+- Install CUDA 12.1 from [NVIDIA](https://developer.nvidia.com/cuda-12-1-0-download-wizard) if needed
+- Ensure `model.pt` exists before Docker build
+- **For SLURM cluster work**: Create `.env` file in project root with:
+  ```
+  HF_TOKEN=your_huggingface_token_here
+  ```
+  This is used by `download_docker_and_data.sh` and `jobscript_slurm.sh`
+- For SLURM cluster submission: `jobscript_slurm.sh` submits training jobs to the HPC cluster
+- For cluster data download: Use `download_docker_and_data.sh` to pull the Apptainer container and download dataset on HPC (requires HF_TOKEN in `.env`)
+
+# Setup Instructions
+
+## Prerequisites
+
+- Python 3.11+
+- ~10GB disk space
+- Optional: Docker for submission, CUDA 12.1 for GPU training
+
+Baseline model (UNet for comparison): [https://github.com/TUE-ARIA/NNCV](https://github.com/TUE-ARIA/NNCV)
+
+## 1. Install Environment
+
+```bash
+python -m venv venv
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/macOS
+pip install -r requirements.txt
+```
+
+Or with Conda:
+
+```bash
+conda env create -f environment.yml
+conda activate nncv-final-assignment
+```
+
+Verify: `python -c "import torch; import timm; print('OK')"`
+
+## 1b. Setup W&B (Weights & Biases)
+
+Create a free account at [wandb.ai](https://wandb.ai) and get your API key from settings.
+
+When you run training (via `bash main.sh` or `python train.py`), you'll be prompted to login:
+
+```bash
+wandb login
+# Paste your API key when prompted
+```
+
+This logs your training metrics to your W&B project.
+
+## 2. Download Dataset
+
+### Option A: From HuggingFace (If you have credentials)
+
+```bash
+hf auth login --token your-hf-token
+hf download TimJaspersUe/5LSM0 --local-dir ./data --repo-type dataset
+```
+
+### Option B: Manual Setup
+
+If you cannot download from HuggingFace, prepare Cityscapes locally with this structure:
+
+```
+data/
+├── cityscapes/
+│   ├── leftImg8bit/
+│   │   ├── train/
+│   │   └── val/
+│   └── gtFine/
+│       ├── train/
+│       └── val/
+```
+
+Ensure `config.py` points to the correct dataset path:
+
+```python
+DATA_DIR = "./data/cityscapes"  # Update if needed
+```
+
+## 3. Training
+
+**Option 1**: Use training script (recommended):
+
+Activate environment and run:
+
+```bash
+# Activate environment
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/macOS
+
+# Run training script
+bash main.sh
+```
+
+This installs dependencies from `requirements.txt`, prompts for wandb login, and trains with all augmentations enabled (Fourier, CopyPaste, FreqBandDropout, SemanticStyleSwap) using config defaults.
+
+**Option 2**: Manual training (customize parameters):
+
+All hyperparameters are defined in `config.py`. Run directly with:
+
+```bash
+python train.py --experiment-id my-exp
+```
+
+To override config values:
+
+```bash
+python train.py --epochs 1 --batch-size 2 --experiment-id test
+```
+
+**Augmentations**: Edit `config.py` to enable/disable:
+
+- `APPLY_FOURIER` - Fourier space augmentation
+- `APPLY_COPYPASTE` - Copy-paste augmentation
+- `APPLY_FREQ_BAND_DROPOUT` - Frequency band dropout
+- `APPLY_SEMANTIC_STYLE_SWAP` - Semantic style transfer
+
+Checkpoints: `checkpoints/<experiment-id>/`
+
+## 4. Visualization & Comparison
+
+**Compare models** (requires 3 pre-trained models in `models/` folder):
+
+Models expected at:
+
+```
+models/
+├── baseline/model.pt
+├── dino_model_without_augmentation/model.pt
+└── dino_model_with_augmentation/model.pt
+```
+
+Compare predictions on sample images:
+
+```bash
+python compare_models.py --image sample_data/aachen_000000_000019_leftImg8bit.png --output comparison.png
+```
+
+Available sample images: `sample_data/aachen_000000_000019_leftImg8bit.png` through `aachen_000051_000019_leftImg8bit.png`
+
+Or use custom image:
+
+```bash
+python compare_models.py --image /path/to/your/image.png --output comparison.png
+```
+
+**Visualize single model** (trained checkpoint):
+
+```bash
+python visualize.py --checkpoint checkpoints/my-exp/model.pt --image sample_data/aachen_000000_000019_leftImg8bit.png
+```
+
+## 5. Docker Submission
+
+**Step 1**: Prepare for submission - edit `predict.py`:
+
+Change line with `Model(pretrained=True)` to `Model(pretrained=False)`:
+
+```python
+model = Model(pretrained=False)  # Already trained, don't download weights
+```
+
+This prevents the container from trying to download DINOv2 weights from HuggingFace (which fails on submission server). Your trained `model.pt` already contains all weights.
+
+**Step 2**: Copy your best trained checkpoint as `model.pt`:
+
+```bash
+cp checkpoints/my-exp/best_model.pt model.pt
+```
+
+**Step 3**: Build Docker image:
+
+```bash
+docker build --no-cache -t my-submission:latest .
+```
+
+**Step 4**: Test locally before submission:
+
+```bash
+mkdir local_data local_output
+
+# Copy test images
+cp sample_data/*.png local_data/
+
+# Run Docker container
+docker run --rm -v "${PWD}\local_data:/data" -v "${PWD}\local_output:/output" my-submission:latest
+```
+
+Check that segmentation masks were created in `local_output/` with same filenames as inputs.
+
+**Step 5**: Export for submission:
+
+```bash
+docker save my-submission:latest -o my-submission.tar
+```
+
+## Notes
+
+- Training without GPU is very slow
+- Check GPU: `python -c "import torch; print(torch.cuda.is_available())"`
+- Install CUDA 12.1 from [NVIDIA](https://developer.nvidia.com/cuda-12-1-0-download-wizard) if needed
+- Ensure `model.pt` exists before Docker build
+- **For SLURM cluster work**: Create `.env` file in project root with:
+  ```
+  HF_TOKEN=your_huggingface_token_here
+  ```
+  This is used by `download_docker_and_data.sh` and `jobscript_slurm.sh`
+- For SLURM cluster submission: `jobscript_slurm.sh` submits training jobs to the HPC cluster
+- For cluster data download: Use `download_docker_and_data.sh` to pull the Apptainer container and download dataset on HPC (requires HF_TOKEN in `.env`)
