@@ -17,7 +17,8 @@ We compare our approach to a baseline **UNet** model provided by the course inst
 
 ## Prerequisites
 
-- Python 3.11+ or Conda/Miniconda
+- Python 3.11+
+- Conda/Miniconda (if using it instead of venv)
 - ~10GB disk space
 - Optional: Docker for submission, CUDA 12.1 for GPU training
 
