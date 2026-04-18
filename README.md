@@ -1,5 +1,20 @@
 # Setup Instructions
 
+## Course Developer Info
+
+**Snellius Username:** `scur2416`  
+**TUE Email:** `p.rempakos@student.tue.nl`
+
+This guide is for the 5LSM0 course at TU/e.
+
+## Overview
+
+This repository implements a robust semantic segmentation model using **DINOv2** with advanced augmentation techniques for the Cityscapes dataset. The model studies robustness and
+the impact of four augmentation techniques on performance.
+Namely, these are a combination of Fourier-space augmentations, copy-paste, frequency band dropout, and semantic style swapping.
+
+![Model Comparison](comparison.png)
+
 ## Prerequisites
 
 - Python 3.11+
@@ -140,6 +155,7 @@ bash main.sh
 This installs dependencies, prompts for wandb login, and trains with parameters from `main.sh` which match `config.py` defaults (80 epochs, batch size 4, all augmentations enabled). Note: `main.sh` parameters supercede `config.py` values.
 
 To modify training parameters, either:
+
 - Edit `main.sh` before running (change `--epochs`, `--batch-size`, etc.)
 - Edit `config.py` and run `python train.py` directly
 
@@ -261,8 +277,6 @@ docker save my-submission:latest -o my-submission.tar
   ```
 
   This is used by `download_docker_and_data.sh` and `jobscript_slurm.sh`
-
-  **Developer note**: Snellius username: `scur2416`, TUE email: `p.rempakos@student.tue.nl`
 
 - For SLURM cluster submission: `jobscript_slurm.sh` submits training jobs to the HPC cluster
 - For cluster data download: Use `download_docker_and_data.sh` to pull the Apptainer container and download dataset on HPC (requires HF_TOKEN in `.env`)
