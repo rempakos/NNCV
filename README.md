@@ -167,15 +167,15 @@ python visualize.py --checkpoint checkpoints/my-exp/model.pt --image sample_data
 
 ## 5. Docker Submission
 
-**Step 1**: Prepare for submission - edit `predict.py`:
+**Step 1**: Prepare for submission - edit `predict.py` !!!
 
-Change line with `Model(pretrained=True)` to `Model(pretrained=False)`:
+Change line with `Model(pretrained=True)` to `Model(pretrained=False)` !!!
 
 ```python
 model = Model(pretrained=False)  # Already trained, don't download weights
 ```
 
-This prevents the container from trying to download DINOv2 weights from HuggingFace (which fails on submission server). Your trained `model.pt` already contains all weights.
+**IMPORTANT**: This prevents the container from trying to download DINOv2 weights from HuggingFace (which fails on submission server). Your trained `model.pt` already contains all weights.
 
 **Step 2**: Copy your best trained checkpoint as `model.pt`:
 
