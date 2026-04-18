@@ -1,0 +1,7 @@
+# Weights and Biases API
+WANDB_API_KEY=your_wandb_api_key
+WANDB_DIR=/path/to/wandb/logs
+WANDB_START_METHOD="thread"
+
+# HuggingFace Token (for dataset download)
+HF_TOKEN=your_huggingface_token

@@ -35,21 +35,13 @@ Verify: `python -c "import torch; import timm; print('OK')"`
 
 ## 1a. Setup Environment Variables
 
-Create a `.env` file in the project root with your API keys:
+Copy the template file and fill in your credentials:
 
 ```bash
-cat > .env << EOF
-# Weights and Biases API
-WANDB_API_KEY=your_wandb_api_key
-WANDB_DIR=/path/to/wandb/logs
-WANDB_START_METHOD="thread"
-
-# HuggingFace Token (for dataset download)
-HF_TOKEN=your_huggingface_token
-EOF
+cp _env .env
 ```
 
-Or manually create `.env` and add:
+Then edit `.env` and add your actual API keys:
 
 ```env
 # Weights and Biases API
