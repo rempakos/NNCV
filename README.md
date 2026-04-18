@@ -35,12 +35,11 @@ Verify: `python -c "import torch; import timm; print('OK')"`
 
 ## 1a. Setup Environment Variables
 
-Adjust the `env.txt` file with your credentials and rename it to `.env`:
+Adjust the `.env` file with your credentials:
 
 ```bash
-# Edit env.txt with your API keys
-# Then rename it to .env (this file is gitignored for security)
-mv env.txt .env  # or rename env.txt .env on Windows
+# Edit .env with your API keys
+nano .env  # or use your preferred editor
 ```
 
 The `.env` file should contain:
