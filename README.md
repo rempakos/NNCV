@@ -11,7 +11,7 @@ This guide is for the 5LSM0 course at TU/e.
 
 This repository implements a robust semantic segmentation model using **DINOv2** with advanced augmentation techniques for the Cityscapes dataset. The model studies robustness and the impact of four augmentation techniques on performance. Namely, these are a combination of Fourier-space augmentations, copy-paste, frequency band dropout, and semantic style swapping.
 
-We compare our approach to a baseline **UNet** model provided by the course instructors, available at the [original repository](https://github.com/TUE-ARIA/NNCV).
+The approach is compared to a baseline **UNet** model provided by the course instructors, available at the [original repository](https://github.com/TUE-ARIA/NNCV).
 
 ![Model Comparison](comparison.png)
 
