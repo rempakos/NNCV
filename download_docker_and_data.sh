@@ -13,7 +13,7 @@ fi
 #SBATCH --time=3:00:00
 
 # Pull container from dockerhub
-apptainer pull container.sif docker://cclaes/5lsm0:v1
+apptainer pull container.sif docker://cclaess/5lsm0:v1
 
 # Set the Hugging Face token as an environment variable
 export HF_TOKEN=$HF_TOKEN
