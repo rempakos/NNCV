@@ -216,11 +216,14 @@ docker save my-submission:latest -o my-submission.tar
 - Install CUDA 12.1 from [NVIDIA](https://developer.nvidia.com/cuda-12-1-0-download-wizard) if needed
 - Ensure `model.pt` exists before Docker build
 - **For SLURM cluster work**: Create `.env` file in project root with:
+
   ```
   HF_TOKEN=your_huggingface_token_here
   ```
+
   This is used by `download_docker_and_data.sh` and `jobscript_slurm.sh`
-  
+
   **Developer note**: Snellius username: `scur2416`, TUE email: `p.rempakos@student.tue.nl`
+
 - For SLURM cluster submission: `jobscript_slurm.sh` submits training jobs to the HPC cluster
 - For cluster data download: Use `download_docker_and_data.sh` to pull the Apptainer container and download dataset on HPC (requires HF_TOKEN in `.env`)
