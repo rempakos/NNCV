@@ -26,6 +26,18 @@ conda activate nncv-final-assignment
 
 Verify: `python -c "import torch; import timm; print('OK')"`
 
+## 1a. Setup Environment Variables
+
+Copy the template and fill in your credentials:
+
+```bash
+cp _env .env
+```
+
+Then edit `.env` and add your API keys:
+- `HF_TOKEN=your_huggingface_token` (for HuggingFace dataset download)
+- `WANDB_API_KEY=your_wandb_api_key` (optional, can also login interactively)
+
 ## 1b. Setup W&B (Weights & Biases)
 
 Create a free account at [wandb.ai](https://wandb.ai) and get your API key from settings.
