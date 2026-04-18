@@ -35,8 +35,19 @@ cp _env .env
 ```
 
 Then edit `.env` and add your API keys:
-- `HF_TOKEN=your_huggingface_token` (for HuggingFace dataset download)
-- `WANDB_API_KEY=your_wandb_api_key` (optional, can also login interactively)
+
+```env
+# Weights and Biases API
+WANDB_API_KEY=your_wandb_api_key
+WANDB_DIR=/path/to/wandb/logs
+WANDB_START_METHOD="thread"
+
+# HuggingFace Token (for dataset download)
+HF_TOKEN=your_huggingface_token
+```
+
+**Required**: `HF_TOKEN` (for downloading dataset from HuggingFace)  
+**Optional**: `WANDB_API_KEY` (can login interactively during training)
 
 ## 1b. Setup W&B (Weights & Biases)
 
