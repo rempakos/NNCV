@@ -15,6 +15,16 @@ The approach is compared to a baseline **UNet** model provided by the course ins
 
 ![Model Comparison](comparison.png)
 
+## Code Files
+
+- `train.py` - Main training script
+- `config.py` - Hyperparameters and augmentation settings
+- `model.py` - DINOv2 model architecture
+- `dataset.py` - Cityscapes dataset handling
+- `predict.py` - Inference and prediction
+- `compare_models.py` - Compare multiple trained models
+- `visualize.py` - Visualize segmentation results
+
 ## Prerequisites
 
 - Python 3.11+
