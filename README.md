@@ -106,13 +106,11 @@ DATA_DIR = "./data/cityscapes"  # Update if needed
 
 ### Option C: On HPC Clusters (Snellius)
 
-Download both the Apptainer container and dataset:
-
 ```bash
 bash download_docker_and_data.sh
 ```
 
-This script pulls the container image and optionally downloads the dataset (requires HF_TOKEN in `.env`).
+Requires HF_TOKEN in `.env`.
 
 ## 3. Training
 
