@@ -15,12 +15,6 @@ git clone https://github.com/rempakos/NNCV.git
 cd NNCV
 ```
 
-Or for local development, use your fork:
-```bash
-git clone https://github.com/YOUR-USERNAME/NNCV.git
-cd NNCV
-```
-
 ## 1. Install Environment
 
 ```bash
