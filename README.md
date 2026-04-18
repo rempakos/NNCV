@@ -76,7 +76,7 @@ This logs your training metrics to your W&B project.
 
 ## 2. Download Dataset
 
-### Option A: From HuggingFace (If you have course credentials)
+### Option A: From HuggingFace (If you have credentials)
 
 ```bash
 hf auth login --token your-hf-token
@@ -112,7 +112,7 @@ Download both the Apptainer container and dataset:
 bash download_docker_and_data.sh
 ```
 
-This script pulls the container image and optionally downloads the dataset (requires `HF_TOKEN` in `.env`).
+This script pulls the container image and optionally downloads the dataset (requires HF_TOKEN in `.env`).
 
 ## 3. Training
 
