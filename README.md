@@ -15,6 +15,8 @@ git clone https://github.com/rempakos/NNCV.git
 cd NNCV
 ```
 
+All subsequent commands should be run from inside the cloned directory.
+
 ## 1. Install Environment
 
 ```bash
