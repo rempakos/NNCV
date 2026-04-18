@@ -51,14 +51,14 @@ Verify: `python -c "import torch; import timm; print('OK')"`
 
 ## 1a. Setup Environment Variables
 
-Adjust the `.env` file with your credentials:
+Copy the template file and adjust with your credentials:
 
 ```bash
-# Edit .env with your API keys
+cp _env .env
 nano .env  # or use your preferred editor
 ```
 
-The `.env` file should contain:
+Update the placeholders in `.env`:
 
 ```env
 # Weights and Biases API
