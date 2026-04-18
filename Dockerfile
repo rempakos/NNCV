@@ -1,27 +1,33 @@
-FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04
+FROM pytorch/pytorch:2.10.0-cuda12.6-cudnn9-runtime
 
-ARG DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-RUN apt-get update -y
-RUN apt-get update --fix-missing -y
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-dev \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get install -y ffmpeg libsm6 libxrender1 libxtst6 zip 
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-RUN apt-get install -y p7zip-full
+RUN pip install --no-cache-dir \
+    torch torchvision --index-url https://download.pytorch.org/whl/cu126
+RUN pip install --no-cache-dir \
+    timm \
+    segmentation-models-pytorch \
+    pillow \
+    albumentations \
+    numpy \
+    opencv-python
 
-# Library components for av
-RUN apt-get install -y \
-    libavformat-dev libavcodec-dev libavdevice-dev \
-    libavutil-dev libswscale-dev libswresample-dev libavfilter-dev
 
+WORKDIR /app
+COPY predict.py /app/predict.py
+COPY model.py /app/model.py
+COPY config.py /app/config.py
+COPY model.pt /app/model.pt
 
-RUN apt-get install -y python3 python3-pip git python3-dev pkg-config htop wget
-
-RUN pip3 install --upgrade pip
-RUN pip3 install torch torchvision
-RUN pip3 install numpy pandas openpyxl scikit-image scikit-learn scipy opencv-python
-RUN pip3 install matplotlib seaborn
-RUN pip3 install wandb
-RUN pip3 install transformers diffusers huggingface_hub[cli]
-
-WORKDIR /app/script
+ENTRYPOINT ["python", "/app/predict.py"]
